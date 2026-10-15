@@ -1,0 +1,34 @@
+100,Math.round(p))),stage,detail});
+function b64bytes(s){const raw=atob(s),o=new Uint8Array(raw.length);for(let i=0;i<raw.length;i++)o[i]=raw.charCodeAt(i);return o;}
+let assetPromise;
+async function loadAssets(){
+ if(assetPromise)return assetPromise;
+ assetPromise=(async()=>{
+  if(!packageFile)throw new Error('ยังไม่ได้เลือกแพ็กเกจ THAI100 v0.9 ZIP');
+  const zbytes=new Uint8Array(await packageFile.arrayBuffer());
+  if(hashBytes(zbytes)!==PACKAGE_ZIP_SHA)throw new Error('แพ็กเกจ v0.9 SHA-256 ไม่ตรง');
+  const zip=await JSZip.loadAsync(zbytes.buffer);
+  const mn=Object.keys(zip.files).find(n=>n.endsWith('/PAYLOAD_MANIFEST.json')||n==='PAYLOAD_MANIFEST.json');
+  if(!mn)throw new Error('PAYLOAD_MANIFEST.json missing');
+  const root=mn.slice(0,-'PAYLOAD_MANIFEST.json'.length),manifest=JSON.parse(await zip.file(mn).async('text'));
+  if(manifest?.schema!=='THAI100_OFFICIALTHAI_FULL_CAUSAL_REGRESSION_PAYLOAD_V1')throw new Error('v0.9 manifest schema mismatch');
+  return {zip,root,manifest};
+ })();
+ return assetPromise;
+}
+async function assetBytes(assets,path,spec){
+ const f=assets.zip.file(assets.root+path);if(!f)throw new Error('payload missing: '+path);
+ const b=await f.async('uint8array');
+ if(spec?.size!==undefined&&b.length!==+spec.size)throw new Error('payload size mismatch: '+path);
+ if(spec?.sha256&&hashBytes(b)!==spec.sha256)throw new Error('payload SHA-256 mismatch: '+path);
+ return b;
+}
+function parseSm4l(index){
+ if(index.length<16||String.fromCharCode(...index.slice(0,4))!=='SM4L')throw new Error('IDX is not SM4L');
+ const c=u32le(index,4);if(index.length!==16+c*16)throw new Error('SM4L size/count mismatch');
+ const rows=[];for(let i=0;i<c;i++)rows.push([u32le(index,16+i*16),u32le(index,20+i*16),u32le(index,24+i*16),u32le(index,28+i*16)]);return rows;
+}
+function writeSm4l(index,i,vals){const dv=new DataView(index.buffer,index.byteOffset,index.byteLength);for(let j=0;j<4;j++)dv.setUint32(16+i*16+j*4,vals[j]>>>0,true);}
+function patchedBlob(base,patches,appendParts=[]){
+ patches=[...patches].sort((a,b)=>a.start-b.start||a.end-b.end);for(let i=1;i<patches.length;i++)if(patches[i].start<patches[i-1].end)throw new Error('patch overlap @ '+patches[i].start);
+ const parts=[];let cur=0;for(const p of patches){if(p.start>cur)parts.push(base.slice(cur,p.start));parts.push(p.data instanceof Blob?p.data:new Blob([p.data]));cur=p.end;}if(cur<base.size)parts.push(b
