@@ -1,0 +1,10 @@
+
+}
+async function walkDirectory(file,extent,size,parent,entries,records,visited){
+ if(visited.has(extent))return;visited.add(extent);const absolute=extent*S,bytes=await readBytes(file,absolute,Math.ceil(size/S)*S);let at=0;
+ while(at<size){const len=bytes[at];if(!len){at=Math.ceil((at+1)/S)*S;continue;}const r=parseRecord(bytes,at,absolute,parent);if(!r)throw new Error(`ISO directory เสียที่ 0x${(absolute+at).toString(16)}`);records.push(r);if(!r.path.endsWith('/.')&&!r.path.endsWith('/..')){entries.set(r.path,r);if(r.isDirectory)await walkDirectory(file,r.extent,r.size,r.path,entries,records,visited);}at+=len;}
+}
+async function parsePathTable(file,offset,size,endian){const fields=[];if(!offset||!size)return fields;const b=await readBytes(file,offset,size);let at=0;while(at+8<=b.length){const n=b[at];if(!n)break;const extent=endian==='le'?u32le(b,at+2):u32be(b,at+2);fields.push({offset:offset+at+2,endian,extent});at+=8+n+(n&1);}return fields;}
+async function parseIso9660(file){
+ let pvdOffset=-1,pvd=null;const descriptorOffsets=[];
+ for(let sec=16;sec<64;sec++){const off=sec*S,d=await readBytes(file,off,S),magic=new TextDecoder('ascii'
