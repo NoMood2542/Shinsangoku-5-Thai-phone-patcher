@@ -1,0 +1,21 @@
+16;out[j+2]=v>>>8;out[j+3]=v;}return out;}
+}
+const sha256={create:()=>new Sha256Inc()};
+function _sha256One(data){return new Sha256Inc().update(data).digest();}
+function bytesToHex(b){let s='';for(const x of b)s+=x.toString(16).padStart(2,'0');return s;}
+function _u16(b,o){return b[o]|(b[o+1]<<8)} function _u32z(b,o){return (b[o]|(b[o+1]<<8)|(b[o+2]<<16)|(b[o+3]<<24))>>>0}
+async function _inflateRaw(bytes){if(typeof DecompressionStream==='undefined')throw new Error('เบราว์เซอร์นี้ไม่มี DeflateStream ที่จำเป็น');const stream=new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'));return new Uint8Array(await new Response(stream).arrayBuffer());}
+class TinyZip{
+ constructor(ab){this.bytes=new Uint8Array(ab);this.entries=new Map();this.files={};this._parse();}
+ _parse(){const b=this.bytes,min=Math.max(0,b.length-0x10016);let e=-1;for(let i=b.length-22;i>=min;i--)if(_u32z(b,i)===0x06054b50){e=i;break;}if(e<0)throw new Error('Patch ZIP เสีย: ไม่พบ central directory');const n=_u16(b,e+10),off=_u32z(b,e+16);let p=off;const td=new TextDecoder();for(let i=0;i<n;i++){if(_u32z(b,p)!==0x02014b50)throw new Error('Patch ZIP central directory เสีย');const method=_u16(b,p+10),cs=_u32z(b,p+20),us=_u32z(b,p+24),nl=_u16(b,p+28),xl=_u16(b,p+30),cl=_u16(b,p+32),lh=_u32z(b,p+42),name=td.decode(b.subarray(p+46,p+46+nl));const ent={name,method,cs,us,lh};this.entries.set(name,ent);this.files[name]={dir:name.endsWith('/'),async:t=>this._async(ent,t)};p+=46+nl+xl+cl;}}
+ file(name){return this.files[name]||null;}
+ async _async(e,type){const b=this.bytes,p=e.lh;if(_u32z(b,p)!==0x04034b50)throw new Error('Patch ZIP local header เสีย');const nl=_u16(b,p+26),xl=_u16(b,p+28),start=p+30+nl+xl,comp=b.subarray(start,start+e.cs);let out;if(e.method===0)out=comp.slice();else if(e.method===8)out=await _inflateRaw(comp);else throw new Error('Patch ZIP compression ไม่รองรับ: '+e.method);if(out.length!==e.us)throw new Error('Patch ZIP entry size mismatch: '+e.name);if(type==='text')return new TextDecoder().decode(out);if(type==='uint8array')return out;return out.buffer;}
+}
+const JSZip={loadAsync:async ab=>new TinyZip(ab)};
+
+// ---- hashBlob.js ----
+async function hashBlob(blob,onProgress){
+  const h=sha256.create(), chunk=8*1024*1024;
+  for(let off=0;off<blob.size;off+=chunk){
+    const b=new Uint8Array(await blob.slice(off,Math.min(blob.size,off+chunk)).arrayBuffer());
+    h.u
