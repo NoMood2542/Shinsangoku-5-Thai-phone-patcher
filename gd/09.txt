@@ -1,0 +1,19 @@
+ase.slice(cur));parts.push(...appendParts);return new Blob(parts,{type:'application/octet-stream'});
+}
+async function rebuildArchiveLbaSafe(container,sourceIso,binEntry,idxBytes,assets,onProgress){
+ const src=parseSm4l(idxBytes),outi=new Uint8Array(idxBytes),specs=assets.manifest.records[container],baseStart=binEntry.extent*S;
+ const allocSectors=Math.ceil(binEntry.size/S),base=sourceIso.slice(baseStart,baseStart+allocSectors*S),patches=[],appendParts=[];let appendSec=allocSectors;
+ const ids=Object.keys(specs).map(Number).sort((a,b)=>a-b),inplace=[],appended=[],modified={};
+ for(let n=0;n<ids.length;n++){const i=ids[n],spec=specs[String(i)];if(i<0||i>=src.length)throw new Error(`record out of range ${container}:${i}`);
+  const [oldsec,span,oldsize,flags]=src[i],data=await assetBytes(assets,spec.file,spec),need=Math.ceil(data.length/S);
+  if(need<=span){const start=oldsec*S,cap=span*S,pad=cap-data.length;patches.push({start,end:start+cap,data:new Blob([data,pad?new Uint8Array(pad):new Uint8Array(0)])});writeSm4l(outi,i,[oldsec,span,data.length,flags]);inplace.push(i);}
+  else{const sec=appendSec,pad=need*S-data.length;appendParts.push(new Blob([data,pad?new Uint8Array(pad):new Uint8Array(0)]));appendSec+=need;writeSm4l(outi,i,[sec,need,data.length,flags]);appended.push(i);}
+  modified[i]=spec.sha256;if((n&7)===0||n+1===ids.length){onProgress?.((n+1)/ids.length,`LINKDATA${container} ${n+1}/${ids.length}`);await new Promise(r=>setTimeout(r,0));}
+ }
+ const bin=patchedBlob(base,patches,appendParts);return {bin,idx:outi,modified,audit:{inplace,appended,source_bytes:binEntry.size,output_bytes:bin.size}};
+}
+function dirPatch(entry,newExtent,newSize){const b=new Uint8Array(16),dv=new DataView(b.buffer);dv.setUint32(0,newExtent>>>0,true);dv.setUint32(4,newExtent>>>0,false);dv.setUint32(8,newSize>>>0,true);dv.setUint32(12,newSize>>>0,false);return {start:entry.recordOffset+2,end:entry.recordOffset+18,data:b};}
+function volPatch(offset,sectors){const b=new Uint8Array(8),dv=new DataView(b.buffer);dv.setUint32(0,sectors>>>0,true);dv.setUint32(4,sectors>>>0,false);return {start:offset+80,end:offset+88,data:b};}
+async function buildIsoLbaSafe(source,layout,replacements){
+ let tailSector=Math.ceil(source.size/S);const patches=[],appendParts=[],actions=[];
+ for(const r of replacements){const e=r.entry,size=r.size,oldAlloc=Math.ceil(e.size/S),newAlloc=Math.ceil(size/S),blob=r
