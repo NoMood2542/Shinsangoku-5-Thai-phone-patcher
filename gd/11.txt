@@ -1,0 +1,12 @@
+
+ const idx00=new Uint8Array(await isoEntryBlob(sourceIso,e00i).arrayBuffer()),idx01=new Uint8Array(await isoEntryBlob(sourceIso,e01i).arrayBuffer());
+ emit(onProgress,27,'สร้าง LINKDATA00_T','63 stage records + causal repairs');const o00=await rebuildArchiveLbaSafe('00',sourceIso,e00b,idx00,assets,(f,d)=>emit(onProgress,27+f*18,'สร้าง LINKDATA00_T',d));
+ emit(onProgress,45,'สร้าง LINKDATA01_T','known-good G3 layer');const o01=await rebuildArchiveLbaSafe('01',sourceIso,e01b,idx01,assets,(f,d)=>emit(onProgress,45+f*10,'สร้าง LINKDATA01_T',d));
+ emit(onProgress,55,'โหลด EBOOT Thai','ตรวจ SHA-256');const eSpec=assets.manifest.eboot,eboot=await assetBytes(assets,eSpec.file,eSpec);if(!(eboot[0]===0x7f&&eboot[1]===0x45&&eboot[2]===0x4c&&eboot[3]===0x46))throw new Error('EBOOT payload is not ELF');
+ emit(onProgress,57,'ตรวจ payload outputs','hash LINKDATA + IDX');const built={L00B:await hashBlob(o00.bin,f=>emit(onProgress,57+f*5,'ตรวจ payload outputs','LINKDATA00_T.BIN')),L00I:hashBytes(o00.idx),L01B:await hashBlob(o01.bin,f=>emit(onProgress,62+f*3,'ตรวจ payload outputs','LINKDATA01_T.BIN')),L01I:hashBytes(o01.idx),EBOOT:eSpec.sha256};
+ emit(onProgress,65,'ประกอบ ISO','LBA-safe: ไม่ขยับไฟล์/โฟลเดอร์ที่ไม่เกี่ยว');const builtIso=await buildIsoLbaSafe(sourceIso,layout,[{entry:e00b,data:o00.bin,size:o00.bin.size},{entry:e00i,data:o00.idx,size:o00.idx.length},{entry:e01b,data:o01.bin,size:o01.bin.size},{entry:e01i,data:o01.idx,size:o01.idx.length},{entry:eeb,data:eboot,size:eboot.length}]);
+ const rebuilt=builtIso.iso;emit(onProgress,69,'ตรวจ ISO ที่สร้าง','re-open + 5 internal hashes + LBA audit');const outLayout=await parseIso9660(rebuilt),checks=[['L00B',INTERNAL.L00B],['L00I',INTERNAL.L00I],['L01B',INTERNAL.L01B],['L01I',INTERNAL.L01I],['EBOOT',INTERNAL.EBOOT]];
+ const finalHashes={};for(let i=0;i<checks.length;i++){const [k,p]=checks[i],h=await hashBlob(isoEntryBlob(rebuilt,getIsoEntry(outLayout,p)),f=>emit(onProgress,69+((i+f)/checks.length)*14,'ตรวจ ISO ที่สร้าง',`${k} ${i+1}/5`));finalHashes[k]=h;if(h!==built[k])throw new Error(`FAIL-CLOSED output mismatch ${k}`);}
+ await verifyLbaDrift(layout,outLayout,new Set(Object.values(INTERNAL).map(x=>x.toUpperCase())));
+ emit(onProgress,84,'คำนวณ output SHA-256','สำหรับ BUILD_REPORT');const outHash=await hashBlob(rebuilt,f=>emit(onProgress,84+f*15,'คำนวณ output SHA-256',`${Math.round(f*100)}%`));
+ emit(onProgress,100,'S
