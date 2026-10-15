@@ -1,0 +1,19 @@
+.data instanceof Blob?r.data:new Blob([r.data]);let newExtent,mode;
+  if(newAlloc<=oldAlloc){const pad=oldAlloc*S-size;patches.push({start:e.extent*S,end:e.extent*S+oldAlloc*S,data:new Blob([blob,pad?new Uint8Array(pad):new Uint8Array(0)])});newExtent=e.extent;mode='IN_PLACE';}
+  else{newExtent=tailSector;const pad=newAlloc*S-size;appendParts.push(new Blob([blob,pad?new Uint8Array(pad):new Uint8Array(0)]));tailSector+=newAlloc;mode='APPEND_RELOCATE';}
+  patches.push(dirPatch(e,newExtent,size));actions.push({path:e.path,old_extent:e.extent,new_extent:newExtent,old_size:e.size,new_size:size,mode});
+ }
+ for(const d of layout.descriptorOffsets)patches.push(volPatch(d,tailSector));
+ const originalPadded=source.size===Math.ceil(source.size/S)*S?source:new Blob([source,new Uint8Array(Math.ceil(source.size/S)*S-source.size)]);
+ const out=patchedBlob(originalPadded,patches,appendParts);if(out.size!==tailSector*S)throw new Error('final ISO size mismatch');return {iso:new Blob([out],{type:'application/x-iso9660-image'}),actions};
+}
+async function verifyLbaDrift(before,after,changedPaths){
+ for(const [path,e] of before.entries){const oe=after.entries.get(path);if(!oe)throw new Error('output missing ISO entry: '+path);if(e.isDirectory&&oe.extent!==e.extent)throw new Error('directory LBA drift: '+path);if(!e.isDirectory&&!changedPaths.has(path)&&oe.extent!==e.extent)throw new Error('unmodified file LBA drift: '+path);}
+}
+async function patchOfficialThai(sourceIso,onProgress){
+ if(!sourceIso.name.toLowerCase().endsWith('.iso'))throw new Error('เลือกไฟล์ .ISO เท่านั้น');
+ if(sourceIso.size!==EXPECTED.isoSize)throw new Error(`ISO ขนาดไม่ตรง clean official CN (${sourceIso.size.toLocaleString()} bytes)`);
+ emit(onProgress,1,'ตรวจ clean CN','SHA-256 1.79 GB แบบ chunked');const srcHash=await hashBlob(sourceIso,f=>emit(onProgress,1+f*19,'ตรวจ clean CN',`${Math.round(f*100)}%`));if(srcHash!==EXPECTED.isoSha)throw new Error('FAIL-CLOSED: full ISO SHA-256 ไม่ตรง official CN ที่รองรับ');
+ emit(onProgress,21,'อ่าน ISO','parse ISO9660');const layout=await parseIso9660(sourceIso);
+ emit(onProgress,23,'โหลด v0.9 payload','ตรวจ embedded package + manifest');const assets=await loadAssets();
+ const e00b=getIsoEntry(layout,INTERNAL.L00B),e00i=getIsoEntry(layout,INTERNAL.L00I),e01b=getIsoEntry(layout,INTERNAL.L01B),e01i=getIsoEntry(layout,INTERNAL.L01I),eeb=getIsoEntry(layout,INTERNAL.EBOOT);
