@@ -1,0 +1,20 @@
+pdate(b); onProgress?.(Math.min(1,(off+b.length)/Math.max(1,blob.size)));
+    await new Promise(r=>setTimeout(r,0));
+  }
+  return bytesToHex(h.digest());
+}
+function hashBytes(bytes){return bytesToHex(_sha256One(bytes));}
+
+// ---- iso9660.js ----
+const ISO_SECTOR=2048;
+const S=ISO_SECTOR;
+const u32le=(b,a)=>new DataView(b.buffer,b.byteOffset+a,4).getUint32(0,true);
+const u32be=(b,a)=>new DataView(b.buffer,b.byteOffset+a,4).getUint32(0,false);
+async function readBytes(f,start,len){return new Uint8Array(await f.slice(start,start+len).arrayBuffer());}
+function cleanName(raw){if(raw.length===1&&raw[0]===0)return'.';if(raw.length===1&&raw[0]===1)return'..';return new TextDecoder('latin1').decode(raw).replace(/;\d+$/,'');}
+function parseRecord(bytes,at,absolute,parent){
+ const len=bytes[at]; if(!len||at+len>bytes.length||len<34)return null;
+ const extent=u32le(bytes,at+2),size=u32le(bytes,at+10),flags=bytes[at+25],nameLen=bytes[at+32];
+ if(33+nameLen>len)return null; const name=cleanName(bytes.slice(at+33,at+33+nameLen));
+ const isDirectory=(flags&2)!==0; const path=(name==='.'||name==='..'?`${parent}/${name}`:`${parent}/${name}`).replace(/\/+/g,'/').toUpperCase();
+ return {path,extent,size,flags,recordOffset:absolute+at,isDirectory};
