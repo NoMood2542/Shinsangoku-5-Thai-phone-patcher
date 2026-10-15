@@ -1,0 +1,4 @@
+ecord defect remains.':'Different crash; capture PC/RA.'}};localStorage.setItem('thai100_v09_last_state',JSON.stringify(state));downloadJson('full_causal_regression_state.json',state);}));
+$('#resetBtn').addEventListener('click',()=>{stopPickerPoll();pickerArmed=false;sourceFile=null;packageFile=null;assetPromise=null;result=null;lastFileSig='';fileInput.value='';packageInput.value='';$('#doneCard').hidden=true;$('#workCard').hidden=false;$('#progressBox').hidden=true;clearError();renderReady();});renderReady();$('#packageMeta').textContent='JS พร้อม · GitHub direct · เลือก v0.9 package';$('#fileMeta').textContent='JS พร้อม · iOS picker hardfix active · แตะเลือก clean CN ISO';
+
+</script></body></html>
