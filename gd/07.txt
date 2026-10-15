@@ -1,0 +1,25 @@
+).decode(d.slice(1,6));if(magic!=='CD001')throw new Error('ไฟล์นี้ไม่ใช่ PSP ISO9660 ที่รองรับ');if(d[0]===1||d[0]===2)descriptorOffsets.push(off);if(d[0]===1&&pvdOffset<0){pvdOffset=off;pvd=d;}if(d[0]===255)break;}
+ if(!pvd)throw new Error('ไม่พบ Primary ISO volume descriptor');
+ const volumeSectors=u32le(pvd,80),pathTableSize=u32le(pvd,132),rootExtent=u32le(pvd,158),rootSize=u32le(pvd,166);if(pvd[156]<34)throw new Error('ISO root record ไม่ถูกต้อง');
+ const entries=new Map(),records=[],root={path:'/',extent:rootExtent,size:rootSize,flags:pvd[181],recordOffset:pvdOffset+156,isDirectory:true};records.push(root);entries.set('/',root);await walkDirectory(file,rootExtent,rootSize,'',entries,records,new Set());
+ const leMain=u32le(pvd,140),leOptional=u32le(pvd,144),beMain=u32be(pvd,148),beOptional=u32be(pvd,152);
+ const pathTableFields=[...(await parsePathTable(file,leMain*S,pathTableSize,'le')),...(await parsePathTable(file,leOptional*S,pathTableSize,'le')),...(await parsePathTable(file,beMain*S,pathTableSize,'be')),...(await parsePathTable(file,beOptional*S,pathTableSize,'be'))];
+ const pvdPathLocationFields=[{offset:pvdOffset+140,endian:'le',extent:leMain},{offset:pvdOffset+144,endian:'le',extent:leOptional},{offset:pvdOffset+148,endian:'be',extent:beMain},{offset:pvdOffset+152,endian:'be',extent:beOptional}].filter(x=>x.extent>0);
+ return {entries,records,volumeSectors,pvdOffset,descriptorOffsets,pathTableFields,pvdPathLocationFields};
+}
+function getIsoEntry(layout,path){const k=path.replace(/;\d+$/,'').toUpperCase(),e=layout.entries.get(k);if(!e)throw new Error(`ไม่พบไฟล์ใน ISO: ${path}`);return e;}
+function isoEntryBlob(file,e){return file.slice(e.extent*S,e.extent*S+e.size);}
+function four(value,little){const o=new Uint8Array(4);new DataView(o.buffer).setUint32(0,value>>>0,little);return o;}
+
+
+
+// ---- OfficialThai v0.9 embedded package ----
+const PACKAGE_ZIP_SHA='1c65d5dcd2a132265482c4182aa94e85f10e6ddc66e90e47bbbab0cc0b953d58';
+let packageFile=null;
+const EXPECTED={isoSize:1792507904,isoSha:'686475bda60781574762220e71c930da4b1b31210e9d7d5dfe1e4b423595aa09'};
+const INTERNAL={
+ 'L00B':'/PSP_GAME/USRDIR/LINKDATA00_T.BIN','L00I':'/PSP_GAME/USRDIR/LINKDATA00_T.IDX',
+ 'L01B':'/PSP_GAME/USRDIR/LINKDATA01_T.BIN','L01I':'/PSP_GAME/USRDIR/LINKDATA01_T.IDX',
+ 'EBOOT':'/PSP_GAME/SYSDIR/EBOOT.BIN'
+};
+const emit=(cb,p,stage,detail)=>cb?.({percent:Math.max(0,Math.min(
