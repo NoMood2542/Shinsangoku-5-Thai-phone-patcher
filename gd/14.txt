@@ -1,0 +1,18 @@
+tap'){
+ pickerArmed=true; pickerPollUntil=Date.now()+45000; clearError(); renderReady();
+ $('#fileMeta').textContent=`เปิด Files (${reason}) · หลังเลือก ISO ให้กลับมาหน้านี้`;
+ stopPickerPoll();
+ pickerPollTimer=setInterval(()=>{
+   if(acceptSelectedFile('poll'))return;
+   if(Date.now()>pickerPollUntil){stopPickerPoll();if(pickerArmed){$('#fileMeta').textContent='ยังไม่เห็นไฟล์ · กด “เช็คไฟล์ที่เลือก” หรือแตะเลือก ISO ใหม่';renderReady();}}
+ },200);
+}
+window.addEventListener('error',e=>{try{showError('JavaScript error: '+(e?.message||'unknown'));}catch{}});window.addEventListener('unhandledrejection',e=>{try{showError('JavaScript error: '+(e?.reason?.message||e?.reason||'promise rejected'));}catch{}});
+packageInput.addEventListener('change',()=>acceptPackageFile('change'));packageInput.addEventListener('input',()=>acceptPackageFile('input'));setInterval(()=>{if(!busy&&packageInput?.files?.length)acceptPackageFile('poll');},700);
+fileInput.addEventListener('click',()=>armPicker('input-click'),true);
+if(pickerEl){pickerEl.addEventListener('pointerdown',()=>armPicker('picker-pointer'),{passive:true});pickerEl.addEventListener('touchstart',()=>armPicker('picker-touch'),{passive:true});}
+fileInput.addEventListener('change',()=>recoverPicker('change'));fileInput.addEventListener('input',()=>recoverPicker('input'));window.addEventListener('focus',()=>recoverPicker('focus'));document.addEventListener('visibilitychange',()=>{if(!document.hidden)recoverPicker('visibilitychange');});window.addEventListener('pageshow',()=>recoverPicker('pageshow'));
+setInterval(()=>{if(!busy&&(pickerArmed||fileInput?.files?.length)&&!sourceFile)acceptSelectedFile('background-poll');},500);
+$('#confirmFileBtn').textContent='✓ เช็คไฟล์ที่เลือก';
+$('#confirmFileBtn').addEventListener('click',()=>{if(!acceptSelectedFile('manual')){pickerArmed=true;renderReady();showError('Safari ยังไม่คืน file handle แต่ระบบกำลัง polling ต่อให้อัตโนมัติ — ถ้ายังไม่ขึ้นให้แตะช่อง ISO แล้วเลือกไฟล์ใหม่');}});
+$('#patchBtn').addEventListener('click',async()=>{if(!sourceFile)acceptSelectedFile('build-button');if(!sourceFile||busy)return;busy=true;clearError();renderReady();$('#patchBtn').textContent='กำลัง BUILD…';setProgress(0,'เริ่ม v0.9','เตรียมระบบ');let lock=null;try{lock=await navigator.wakeLock?.request?.('screen')}catch{}const block=e=>{e.preventDefault();e.returnValue='';};addEventListener('beforeunloa
