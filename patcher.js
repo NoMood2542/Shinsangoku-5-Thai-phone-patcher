@@ -1,5 +1,5 @@
-// ---- OfficialThai v0.9 embedded package ----
-const PACKAGE_ZIP_SHA='1c65d5dcd2a132265482c4182aa94e85f10e6ddc66e90e47bbbab0cc0b953d58';
+// ---- THAI100 OfficialThai v0.13.1 runtime package ----
+const PACKAGE_ZIP_SHA='1ab488e3cf93b9e3ff4d4bc0b099fcde696dbd560681495d8dc4d975ce05984c';
 let packageFile=null;
 const EXPECTED={isoSize:1792507904,isoSha:'686475bda60781574762220e71c930da4b1b31210e9d7d5dfe1e4b423595aa09'};
 const INTERNAL={
@@ -12,15 +12,15 @@ function b64bytes(s){const raw=atob(s),o=new Uint8Array(raw.length);for(let i=0;
 let assetPromise;
 async function loadAssets(){
  if(assetPromise)return assetPromise;
- if(!packageFile)throw new Error('กรุณาเลือก THAI100 v0.9.0 payload ZIP ก่อน');
+ if(!packageFile)throw new Error('กรุณาเลือก THAI100 v0.13.1 runtime candidate ZIP ก่อน');
  assetPromise=(async()=>{
   const ab=await packageFile.arrayBuffer(),zbytes=new Uint8Array(ab);
-  if(hashBytes(zbytes)!==PACKAGE_ZIP_SHA)throw new Error('payload ZIP SHA-256 ไม่ตรง v0.9.0 ที่รองรับ');
+  if(hashBytes(zbytes)!==PACKAGE_ZIP_SHA)throw new Error('runtime ZIP SHA-256 ไม่ตรง v0.13.1 ที่รองรับ');
   const zip=await JSZip.loadAsync(ab);
   const mn=Object.keys(zip.files).find(n=>n.endsWith('/PAYLOAD_MANIFEST.json')||n==='PAYLOAD_MANIFEST.json');
   if(!mn)throw new Error('PAYLOAD_MANIFEST.json missing');
   const root=mn.slice(0,-'PAYLOAD_MANIFEST.json'.length),manifest=JSON.parse(await zip.file(mn).async('text'));
-  if(manifest?.schema!=='THAI100_OFFICIALTHAI_FULL_CAUSAL_REGRESSION_PAYLOAD_V1')throw new Error('v0.9 manifest schema mismatch');
+  if(manifest?.schema!=='THAI100_OFFICIALTHAI_PAYLOAD_MANIFEST_C4C_P2_RUNTIME_CANDIDATE')throw new Error('v0.13.1 manifest schema mismatch');
   return {zip,root,manifest};
  })();
  return assetPromise;
@@ -75,11 +75,11 @@ async function patchOfficialThai(sourceIso,onProgress){
  if(sourceIso.size!==EXPECTED.isoSize)throw new Error(`ISO ขนาดไม่ตรง clean official CN (${sourceIso.size.toLocaleString()} bytes)`);
  emit(onProgress,1,'ตรวจ clean CN','SHA-256 1.79 GB แบบ chunked');const srcHash=await hashBlob(sourceIso,f=>emit(onProgress,1+f*19,'ตรวจ clean CN',`${Math.round(f*100)}%`));if(srcHash!==EXPECTED.isoSha)throw new Error('FAIL-CLOSED: full ISO SHA-256 ไม่ตรง official CN ที่รองรับ');
  emit(onProgress,21,'อ่าน ISO','parse ISO9660');const layout=await parseIso9660(sourceIso);
- emit(onProgress,23,'โหลด v0.9 payload','ตรวจ embedded package + manifest');const assets=await loadAssets();
+ emit(onProgress,23,'โหลด v0.13.1 payload','ตรวจ runtime package + manifest');const assets=await loadAssets();
  const e00b=getIsoEntry(layout,INTERNAL.L00B),e00i=getIsoEntry(layout,INTERNAL.L00I),e01b=getIsoEntry(layout,INTERNAL.L01B),e01i=getIsoEntry(layout,INTERNAL.L01I),eeb=getIsoEntry(layout,INTERNAL.EBOOT);
  const idx00=new Uint8Array(await isoEntryBlob(sourceIso,e00i).arrayBuffer()),idx01=new Uint8Array(await isoEntryBlob(sourceIso,e01i).arrayBuffer());
- emit(onProgress,27,'สร้าง LINKDATA00_T','63 stage records + causal repairs');const o00=await rebuildArchiveLbaSafe('00',sourceIso,e00b,idx00,assets,(f,d)=>emit(onProgress,27+f*18,'สร้าง LINKDATA00_T',d));
- emit(onProgress,45,'สร้าง LINKDATA01_T','known-good G3 layer');const o01=await rebuildArchiveLbaSafe('01',sourceIso,e01b,idx01,assets,(f,d)=>emit(onProgress,45+f*10,'สร้าง LINKDATA01_T',d));
+ emit(onProgress,27,'สร้าง LINKDATA00_T','C4C runtime candidate records');const o00=await rebuildArchiveLbaSafe('00',sourceIso,e00b,idx00,assets,(f,d)=>emit(onProgress,27+f*18,'สร้าง LINKDATA00_T',d));
+ emit(onProgress,45,'สร้าง LINKDATA01_T','font + C4B2 + C4B3 + C4C');const o01=await rebuildArchiveLbaSafe('01',sourceIso,e01b,idx01,assets,(f,d)=>emit(onProgress,45+f*10,'สร้าง LINKDATA01_T',d));
  emit(onProgress,55,'โหลด EBOOT Thai','ตรวจ SHA-256');const eSpec=assets.manifest.eboot,eboot=await assetBytes(assets,eSpec.file,eSpec);if(!(eboot[0]===0x7f&&eboot[1]===0x45&&eboot[2]===0x4c&&eboot[3]===0x46))throw new Error('EBOOT payload is not ELF');
  emit(onProgress,57,'ตรวจ payload outputs','hash LINKDATA + IDX');const built={L00B:await hashBlob(o00.bin,f=>emit(onProgress,57+f*5,'ตรวจ payload outputs','LINKDATA00_T.BIN')),L00I:hashBytes(o00.idx),L01B:await hashBlob(o01.bin,f=>emit(onProgress,62+f*3,'ตรวจ payload outputs','LINKDATA01_T.BIN')),L01I:hashBytes(o01.idx),EBOOT:eSpec.sha256};
  emit(onProgress,65,'ประกอบ ISO','LBA-safe: ไม่ขยับไฟล์/โฟลเดอร์ที่ไม่เกี่ยว');const builtIso=await buildIsoLbaSafe(sourceIso,layout,[{entry:e00b,data:o00.bin,size:o00.bin.size},{entry:e00i,data:o00.idx,size:o00.idx.length},{entry:e01b,data:o01.bin,size:o01.bin.size},{entry:e01i,data:o01.idx,size:o01.idx.length},{entry:eeb,data:eboot,size:eboot.length}]);
@@ -88,7 +88,7 @@ async function patchOfficialThai(sourceIso,onProgress){
  await verifyLbaDrift(layout,outLayout,new Set(Object.values(INTERNAL).map(x=>x.toUpperCase())));
  emit(onProgress,84,'คำนวณ output SHA-256','สำหรับ BUILD_REPORT');const outHash=await hashBlob(rebuilt,f=>emit(onProgress,84+f*15,'คำนวณ output SHA-256',`${Math.round(f*100)}%`));
  emit(onProgress,100,'STATIC PASS','พร้อมบันทึกและเทส PPSSPP');const base=sourceIso.name.replace(/\.iso$/i,'');
- const strategy={stage_records:63,rec29_child4_runtime_confirmation:'PASS',rec29_r8_s1_runtime_confirmation:'PASS',rec29_r8_s1_payload_bytes:76,rec29_r8_s1_official_max_payload_bytes:80};
- const report={schema:'THAI100_OFFICIALTHAI_FULL_CAUSAL_REGRESSION_BUILD_V1_IPHONE',status:'STATIC_BUILD_PASS__PPSSPP_REQUIRED',candidate_id:'FULL_CAUSAL_REGRESSION',description:'G3 + all 63 Thai stage records with strategy child4 envelope guard + runtime-confirmed REC29 R8/S1 envelope repair',source_iso_sha256:srcHash,output_size:rebuilt.size,output_sha256:outHash,modified_records:{'00':Object.keys(o00.modified).map(Number).sort((a,b)=>a-b),'01':Object.keys(o01.modified).map(Number).sort((a,b)=>a-b)},strategy_gate:strategy,archive_audit:{'00':o00.audit,'01':o01.audit},iso_actions:builtIso.actions,internal_hashes:built,runtime_flow:'Boot -> Menu -> Character Select -> Cutscene -> Battle Preparation -> Start Battle -> Gameplay',verdict_rule:{PASS:'Both known REC29 causal repairs survive the full 63-stage regression path.',HANG_BATTLE_PREP:'A further independent stage/record defect remains; preserve both confirmed repairs and isolate the next divergence.',CRASH:'Capture new PC/RA; preserve both confirmed repairs.'},builder:'iPhone Safari GitHub-only v0.9.2'};
- return {iso:rebuilt,fileName:`${base}_THAI_OFFICIALTHAI_FULL_CAUSAL_v0.9.0.iso`,report};
+ const c4c2=assets.manifest.c4c_phase2||{};
+ const report={schema:'THAI100_OFFICIALTHAI_C4C_P2_IPHONE_BUILD_V1',status:'STATIC_BUILD_PASS__PPSSPP_REQUIRED',candidate_id:'C4C_PHASE2_v0.13.1',description:'Combined C4B2 + C4B3 + C4C Phase2 runtime candidate. CN-native double-byte advance redirected to native L width 7px/9px.',source_iso_sha256:srcHash,payload_zip_sha256:PACKAGE_ZIP_SHA,payload_manifest_schema:assets.manifest.schema,eboot_sha256:eSpec.sha256,output_size:rebuilt.size,output_sha256:outHash,modified_records:{'00':Object.keys(o00.modified).map(Number).sort((a,b)=>a-b),'01':Object.keys(o01.modified).map(Number).sort((a,b)=>a-b)},archive_audit:{'00':o00.audit,'01':o01.audit},iso_actions:builtIso.actions,internal_hashes:built,c4c_phase2:c4c2,runtime_flow:'Cold Boot -> Menu -> Character Select -> Stage/Loading -> Gameplay -> Database/Timeline -> Save/Load',runtime_checks:['Thai readability','tone/vowel placement','7/9px spacing','0-9 digits','clipping','line wrap','C4B2/C4B3 raster surfaces','PMF playback'],verdict_rule:{PASS:'Full runtime route passes and Thai is readable without blocking clipping/layout defects.',FONT_LAYOUT_FAIL:'Capture screenshots and exact widget/menu path for C4C targeted correction.',CRASH:'Capture exact screen/step and PPSSPP evidence; preserve static-frozen payload until isolated.'},builder:'iPhone Safari GitHub Pages v0.13.1'};
+ return {iso:rebuilt,fileName:`${base}_THAI100_C4C_P2_v0.13.1.iso`,report};
 }
